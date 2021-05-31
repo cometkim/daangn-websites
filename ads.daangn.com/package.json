@@ -10,7 +10,9 @@
     "clean": "gatsby clean"
   },
   "dependencies": {
+    "@stitches/react": "^0.1.9",
     "gatsby": "^3.5.0",
+    "gatsby-theme-stitches": "^0.1.1",
     "react": "experimental",
     "react-dom": "experimental"
   }
