@@ -1,0 +1,17 @@
+{
+  "name": "ads.daangn.com",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "develop": "gatsby develop",
+    "start": "gatsby develop",
+    "build": "gatsby build",
+    "serve": "gatsby serve",
+    "clean": "gatsby clean"
+  },
+  "dependencies": {
+    "gatsby": "^3.5.0",
+    "react": "experimental",
+    "react-dom": "experimental"
+  }
+}
