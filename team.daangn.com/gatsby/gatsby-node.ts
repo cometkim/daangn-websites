@@ -160,6 +160,7 @@ export const createPages: GatsbyNode['createPages'] = async ({
       nodes: {
         id: string,
         ghId: string,
+        _customQuestionMigrated: boolean,
       }[],
       group: {
         nodes: {
@@ -176,6 +177,7 @@ export const createPages: GatsbyNode['createPages'] = async ({
         nodes {
           id
           ghId
+          _customQuestionMigrated
         }
         group(field: chapter, limit: 1) {
           nodes {
@@ -202,7 +204,9 @@ export const createPages: GatsbyNode['createPages'] = async ({
     });
     actions.createPage({
       path: `/jobs/${jobPost.ghId}/apply/`,
-      component: require.resolve('./src/templates/JobApplicationPage.tsx'),
+      component: jobPost._customQuestionMigrated
+        ? require.resolve('./src/templates/JobApplicationPageCQ.tsx')
+        : require.resolve('./src/templates/JobApplicationPage.tsx'),
       context: {
         id: jobPost.id,
         ghId: jobPost.ghId,
