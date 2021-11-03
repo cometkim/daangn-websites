@@ -6,6 +6,7 @@ import { GatsbySeo } from 'gatsby-plugin-next-seo';
 import { rem } from 'polished';
 import { required } from '@cometjs/core';
 import type { PropOf, RefOf } from '@cometjs/react-utils';
+import { mapAbstractType } from '@cometjs/graphql-utils';
 
 import _PageTitle from '~/components/PageTitle';
 import _FormField from '~/components/FormField';
@@ -13,7 +14,7 @@ import Button from '~/components/Button';
 import _Spinner from '~/components/Spinner';
 
 import type { ApplicationForm } from '~/utils/applicationForm';
-import { makeClient, makeEndpoint } from '~/utils/applicationForm';
+import { makeClient, makeEndpoint, makeNewEndpoint } from '~/utils/applicationForm';
 import * as Base64 from '~/utils/base64';
 
 type JobApplicationPageProps = PageProps<GatsbyTypes.JobApplicationPageCQQuery, GatsbyTypes.SitePageContext>;
@@ -26,6 +27,33 @@ export const query = graphql`
       ghId
       title
       portfolioRequired
+      parentJob {
+        questions {
+          __typename
+          name
+          label
+          required
+          description
+          ...on GreenhouseJobBoardJobQuestionForYesNo {
+            options {
+              label
+              value
+            }
+          }
+          ...on GreenhouseJobBoardJobQuestionForSingleSelect {
+            options {
+              label
+              value
+            }
+          }
+          ...on GreenhouseJobBoardJobQuestionForMultiSelect {
+            options {
+              label
+              value
+            }
+          }
+        }
+      }
     }
     privacyPolicy: prismicTermsAndConditions(uid: { eq: "job-application-privacy" }) {
       id
@@ -126,7 +154,7 @@ const JobApplicationPage: React.FC<JobApplicationPageProps> = ({
 
   const [state, dispatch] = React.useReducer(reducer, initialState);
 
-  const jobApplicationFormEndpoint = makeEndpoint(
+  const jobApplicationFormEndpoint = makeNewEndpoint(
     process.env.GATSBY_JOB_APPLICATION_FORM_HOST || 'http://localhost:8787',
     data.jobPost.ghId,
   );
@@ -200,6 +228,8 @@ const JobApplicationPage: React.FC<JobApplicationPageProps> = ({
     }
   }, [state]);
 
+  const portfolioField = data.jobPost.parentJob.questions.find(question => question.name === 'cover_letter');
+
   return (
     <Form
       ref={formRef}
@@ -210,14 +240,16 @@ const JobApplicationPage: React.FC<JobApplicationPageProps> = ({
       <GatsbySeo noindex />
       <FormField
         variants={{ type: 'text' }}
-        name="name"
+        name="first_name"
         label="이름"
         placeholder="지원자 이름을 입력해주세요."
         required
       />
+      {/* Treat the first_name as fullname */}
+      <input type="hidden" name="last_name" value={"\u200b"} />
       <FormField
         variants={{ type: 'tel' }}
-        name="phone_number"
+        name="phone"
         label="전화번호"
         placeholder="연락 가능한 전화번호를 입력해주세요."
         required
@@ -240,61 +272,91 @@ const JobApplicationPage: React.FC<JobApplicationPageProps> = ({
         placeholder="파일 첨부하기"
         required
       />
-      <FormField
-        variants={{
-          type: 'file',
-          accepts: greenhouseAcceptedMimeTypes,
-        }}
-        name="portfolio"
-        label="포트폴리오"
-        placeholder="파일 첨부하기"
-        description="*포트폴리오는 최대 50MB까지 업로드 가능해요."
-        required={data.jobPost.portfolioRequired}
-      />
-      <FormField
-        variants={{
-          type: 'radio',
-          options: [
-            { label: '해당', value: 'skilled_industrial_personnel' },
-            { label: '비해당', value: 'no' },
-          ],
-          defaultValue: 'no',
-        }}
-        name="alternative_civilian"
-        label="산업기능요원"
-        required
-      />
-      <FormField
-        variants={{
-          type: 'select',
-          options: [
-            { label: '해당 없음', value: 'no' },
-            { label: '일반', value: 'normal' },
-            { label: '산재', value: 'industry' },
-            { label: '보훈', value: 'military' },
-          ],
-          defaultValue: 'no',
-        }}
-        label="장애사항"
-        name="disability"
-        required
-      />
-      <FormField
-        variants={{
-          type: 'radio',
-          options: [
-            { label: '대상', value: 'yes' },
-            { label: '비대상', value: 'no' },
-          ],
-          defaultValue: 'no',
-        }}
-        name="veterans"
-        label="보훈대상 여부"
-        required
-      />
-      <FormHelpText>
-        * 보훈 및 장애 사항은 채용 과정에서 불이익이 없습니다.
-      </FormHelpText>
+      {portfolioField && (
+        <FormField
+          variants={{
+            type: 'file',
+            accepts: greenhouseAcceptedMimeTypes,
+          }}
+          name={portfolioField.name}
+          label="포트폴리오"
+          description="포트폴리오는 최대 50MB까지 업로드 가능해요."
+          placeholder="파일 첨부하기"
+          required={portfolioField.required}
+        />
+      )}
+      {data.jobPost.parentJob.questions
+        // Note: Custom Question 만 따로 렌더링
+        .filter(question => question.name.startsWith('question'))
+        .map(question => mapAbstractType(question, {
+        GreenhouseJobBoardJobQuestionForShortText: question => (
+          <FormField
+            variants={{ type: 'text' }}
+            key={question.name}
+            name={question.name}
+            label={question.label}
+            required={question.required}
+          />
+        ),
+        GreenhouseJobBoardJobQuestionForLongText: question => (
+          <FormField
+            variants={{ type: 'longtext' }}
+            key={question.name}
+            name={question.name}
+            label={question.label}
+            required={question.required}
+          />
+        ),
+        GreenhouseJobBoardJobQuestionForAttachment: question => (
+          <FormField
+            variants={{
+              type: 'file',
+              accepts: greenhouseAcceptedMimeTypes,
+            }}
+            placeholder="파일 첨부하기"
+            key={question.name}
+            name={question.name}
+            label={question.label}
+            required={question.required}
+          />
+        ),
+        GreenhouseJobBoardJobQuestionForYesNo: question => (
+          <FormField
+            variants={{
+              type: 'select',
+              options: [...question.options],
+            }}
+            key={question.name}
+            name={question.name}
+            label={question.label}
+            required={question.required}
+          />
+        ),
+        GreenhouseJobBoardJobQuestionForSingleSelect: question => (
+          <FormField
+            variants={{
+              type: 'select',
+              options: [...question.options],
+            }}
+            key={question.name}
+            name={question.name}
+            label={question.label}
+            required={question.required}
+          />
+        ),
+        GreenhouseJobBoardJobQuestionForMultiSelect: question => (
+          <FormField
+            variants={{
+              type: 'select',
+              options: [...question.options],
+            }}
+            key={question.name}
+            name={question.name}
+            label={question.label}
+            required={question.required}
+          />
+        ),
+      }))}
       {data.privacyPolicy?.data?.content?.html && (
         <FormField
           variants={{
